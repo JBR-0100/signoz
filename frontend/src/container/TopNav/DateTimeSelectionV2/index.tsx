@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { useIsFetching, useQueryClient } from 'react-query';
 // eslint-disable-next-line no-restricted-imports
 import { connect, useDispatch, useSelector } from 'react-redux';
 import { RouteComponentProps, withRouter } from 'react-router-dom';
@@ -34,6 +35,7 @@ import { persistTimeDurationForRoute } from 'utils/metricsTimeStorageUtils';
 import { normalizeTimeToMs } from 'utils/timeUtils';
 import { v4 as uuid } from 'uuid';
 
+import { REACT_QUERY_KEY } from '../../../constants/reactQueryKeys';
 import AutoRefresh from '../AutoRefreshV2';
 import { DateTimeRangeType } from '../CustomDateTimeModal';
 import {
@@ -352,7 +354,14 @@ function DateTimeSelection({
 		],
 	);
 
+	const queryClient = useQueryClient();
+	const isRefreshingQueries = useIsFetching({
+		queryKey: [REACT_QUERY_KEY.AUTO_REFRESH_QUERY],
+	});
 	const onRefreshHandler = (): void => {
+		queryClient.invalidateQueries({
+			queryKey: [REACT_QUERY_KEY.AUTO_REFRESH_QUERY],
+		});
 		onSelectHandler(selectedTime);
 		onLastRefreshHandler();
 	};
@@ -732,7 +741,13 @@ function DateTimeSelection({
 					{showAutoRefresh && selectedTime !== 'custom' && (
 						<div className="refresh-actions">
 							<FormItem hidden={refreshButtonHidden} className="refresh-btn">
-								<Button icon={<SyncOutlined />} onClick={onRefreshHandler} />
+								<Button
+									icon={<SyncOutlined />}
+									loading={!!isRefreshingQueries}
+									onClick={(): void => {
+										onRefreshHandler();
+									}}
+								/>
 							</FormItem>
 
 							<FormItem>
