@@ -3,7 +3,6 @@ package querier
 import (
 	"bytes"
 	"context"
-	goerrors "errors"
 	"fmt"
 	"log/slog"
 	"sort"
@@ -80,7 +79,7 @@ var userFacingCHCodes = map[chproto.Error]bool{
 
 func mapClickHouseError(err error) error {
 	var ex *clickhouse.Exception
-	if goerrors.As(err, &ex) && userFacingCHCodes[chproto.Error(ex.Code)] {
+	if errors.As(err, &ex) && userFacingCHCodes[chproto.Error(ex.Code)] {
 		return errors.NewInvalidInputf(errors.CodeInvalidInput, "%s", ex.Message)
 	}
 	return err

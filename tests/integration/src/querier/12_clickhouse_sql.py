@@ -65,12 +65,12 @@ def test_clickhouse_sql_valid_scalar_query(
 
     count = get_scalar_value(body, "A")
     assert count is not None, "Expected a scalar count value in the response"
-    assert count >= num_inserted_logs, (
-        f"Expected count >= {num_inserted_logs}, got {count}"
-    )
+    assert (
+        count == num_inserted_logs
+    ), f"Expected count == {num_inserted_logs}, got {count}"
+
 
 def test_clickhouse_sql_valid_raw_query(
-
     signoz: types.SigNoz,
     create_user_admin: None,  # pylint: disable=unused-argument
     get_token: Callable[[str, str], str],
@@ -123,21 +123,22 @@ def test_clickhouse_sql_valid_raw_query(
     body = response.json()
     assert body["status"] == "success"
 
+
 @pytest.mark.parametrize(
     "query, expected_error",
     [
         (
             "SELECT * FROM signoz_logs.distributed_logs LIMIT 10",
-            "deprecated table", # This is captured by validate()
+            "deprecated table",  # This is captured by validate()
         ),
         (
             "SELECT count() AS value FROM signoz_logs.logs_v2",
-            "local table", # This is captured by validate()
+            "local table",  # This is captured by validate()
         ),
         (
             "SELECT * from invalid_table",
-            "Unknown table expression", # This is captured by mapClickHouseError()
-        )
+            "Unknown table expression",  # This is captured by mapClickHouseError()
+        ),
     ],
 )
 def test_clickhouse_sql_invalid_queries(
