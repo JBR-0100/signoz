@@ -5,7 +5,6 @@ import logEvent from 'api/common/logEvent';
 import RouteTab from 'components/RouteTab';
 import { FeatureKeys } from 'constants/features';
 import ROUTES from 'constants/routes';
-import { IS_SERVICE_ACCOUNTS_ENABLED } from 'container/ServiceAccountsSettings/config';
 import { routeConfig } from 'container/SideNav/config';
 import { getQueryString } from 'container/SideNav/helper';
 import { settingsNavSections } from 'container/SideNav/menuItems';
@@ -86,8 +85,7 @@ function SettingsPage(): JSX.Element {
 							item.key === ROUTES.INGESTION_SETTINGS ||
 							item.key === ROUTES.ORG_SETTINGS ||
 							item.key === ROUTES.MEMBERS_SETTINGS ||
-							(IS_SERVICE_ACCOUNTS_ENABLED &&
-								item.key === ROUTES.SERVICE_ACCOUNTS_SETTINGS) ||
+							item.key === ROUTES.SERVICE_ACCOUNTS_SETTINGS ||
 							item.key === ROUTES.SHORTCUTS
 								? true
 								: item.isEnabled,
@@ -119,8 +117,7 @@ function SettingsPage(): JSX.Element {
 							item.key === ROUTES.API_KEYS ||
 							item.key === ROUTES.ORG_SETTINGS ||
 							item.key === ROUTES.MEMBERS_SETTINGS ||
-							(IS_SERVICE_ACCOUNTS_ENABLED &&
-								item.key === ROUTES.SERVICE_ACCOUNTS_SETTINGS) ||
+							item.key === ROUTES.SERVICE_ACCOUNTS_SETTINGS ||
 							item.key === ROUTES.INGESTION_SETTINGS
 								? true
 								: item.isEnabled,
@@ -147,8 +144,7 @@ function SettingsPage(): JSX.Element {
 							item.key === ROUTES.API_KEYS ||
 							item.key === ROUTES.ORG_SETTINGS ||
 							item.key === ROUTES.MEMBERS_SETTINGS ||
-							(IS_SERVICE_ACCOUNTS_ENABLED &&
-								item.key === ROUTES.SERVICE_ACCOUNTS_SETTINGS)
+							item.key === ROUTES.SERVICE_ACCOUNTS_SETTINGS
 								? true
 								: item.isEnabled,
 					}));
