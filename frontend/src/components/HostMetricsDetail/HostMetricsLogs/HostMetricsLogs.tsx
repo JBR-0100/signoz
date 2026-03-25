@@ -1,87 +1,153 @@
-import { useCallback, useEffect, useMemo, useRef } from 'react';
-import { useQuery } from 'react-query';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Virtuoso, VirtuosoHandle } from 'react-virtuoso';
 import { Card } from 'antd';
+import logEvent from 'api/common/logEvent';
 import LogDetail from 'components/LogDetail';
 import RawLogView from 'components/Logs/RawLogView';
 import OverlayScrollbar from 'components/OverlayScrollbar/OverlayScrollbar';
-import { DEFAULT_ENTITY_VERSION } from 'constants/app';
+import QuerySearch from 'components/QueryBuilderV2/QueryV2/QuerySearch/QuerySearch';
+import { InfraMonitoringEvents } from 'constants/events';
 import LogsError from 'container/LogsError/LogsError';
 import { LogsLoading } from 'container/LogsLoading/LogsLoading';
 import { FontSize } from 'container/OptionsMenu/types';
-import { useHandleLogsPagination } from 'hooks/infraMonitoring/useHandleLogsPagination';
+import DateTimeSelectionV2 from 'container/TopNav/DateTimeSelectionV2';
+import {
+	CustomTimeType,
+	Time,
+} from 'container/TopNav/DateTimeSelectionV2/types';
+import { getOldLogsOperatorFromNew } from 'hooks/logs/useActiveLog';
 import useLogDetailHandlers from 'hooks/logs/useLogDetailHandlers';
 import useScrollToLog from 'hooks/logs/useScrollToLog';
-import { GetMetricQueryRange } from 'lib/dashboard/getQueryResults';
+import useDebounce from 'hooks/useDebounce';
+import { generateFilterQuery } from 'lib/logs/generateFilterQuery';
+import { parseAsString, useQueryState } from 'nuqs';
 import { ILog } from 'types/api/logs/log';
-import { IBuilderQuery } from 'types/api/queryBuilder/queryBuilderData';
+import { DataSource } from 'types/common/queryBuilder';
+import { validateQuery } from 'utils/queryValidationUtils';
 
-import { getHostLogsQueryPayload } from './constants';
+import {
+	getHostLogsQueryPayload,
+	HOST_METRICS_LOGS_EXPR_QUERY_KEY,
+} from './constants';
+import { useInfiniteHostMetricLogs } from './hooks';
 import NoLogsContainer from './NoLogsContainer';
 
 import './HostMetricLogs.styles.scss';
 
 interface Props {
+	initialExpression: string;
 	timeRange: {
 		startTime: number;
 		endTime: number;
 	};
-	filters: IBuilderQuery['filters'];
+	isModalTimeSelection: boolean;
+	handleTimeChange: (
+		interval: Time | CustomTimeType,
+		dateTimeRange?: [number, number],
+	) => void;
+	selectedInterval: Time;
 }
 
-function HostMetricsLogs({ timeRange, filters }: Props): JSX.Element {
+const EXPRESSION_DEBOUNCE_TIME_MS = 300;
+
+function HostMetricsLogs({
+	initialExpression,
+	timeRange,
+	isModalTimeSelection,
+	handleTimeChange,
+	selectedInterval,
+}: Props): JSX.Element {
 	const virtuosoRef = useRef<VirtuosoHandle>(null);
+
+	const [filterExpression, setFilterExpression] = useQueryState(
+		HOST_METRICS_LOGS_EXPR_QUERY_KEY,
+		parseAsString,
+	);
+
+	const [inputExpression, setInputExpression] = useState(
+		filterExpression || initialExpression,
+	);
+
+	useEffect(() => {
+		setInputExpression(initialExpression);
+		setFilterExpression(initialExpression);
+	}, [initialExpression, setFilterExpression]);
+
+	const debouncedFilterExpression = useDebounce(
+		filterExpression?.trim() || initialExpression,
+		EXPRESSION_DEBOUNCE_TIME_MS,
+	);
+
 	const {
 		activeLog,
-		onAddToQuery,
 		selectedTab,
 		handleSetActiveLog,
 		handleCloseLogDetail,
 	} = useLogDetailHandlers();
 
-	const basePayload = getHostLogsQueryPayload(
-		timeRange.startTime,
-		timeRange.endTime,
-		filters,
+	const onAddToQuery = useCallback(
+		(fieldKey: string, fieldValue: string, operator: string): void => {
+			handleCloseLogDetail();
+
+			const partExpression = generateFilterQuery({
+				fieldKey,
+				fieldValue,
+				type: getOldLogsOperatorFromNew(operator),
+			});
+
+			const newExpression = inputExpression.trim()
+				? `${inputExpression} AND ${partExpression}`
+				: partExpression;
+
+			setInputExpression(newExpression);
+			setFilterExpression(newExpression);
+		},
+		[inputExpression, setFilterExpression, handleCloseLogDetail],
 	);
+
+	const handleFilterChange = useCallback(
+		(expression: string): void => {
+			setInputExpression(expression);
+
+			const validation = validateQuery(expression);
+			if (validation.isValid) {
+				setFilterExpression(expression);
+
+				logEvent(InfraMonitoringEvents.FilterApplied, {
+					entity: InfraMonitoringEvents.HostEntity,
+					view: InfraMonitoringEvents.LogsView,
+					page: InfraMonitoringEvents.DetailedPage,
+				});
+			}
+		},
+		[setFilterExpression],
+	);
+
+	const queryData = useMemo(
+		() =>
+			getHostLogsQueryPayload({
+				start: timeRange.startTime,
+				end: timeRange.endTime,
+				// this should use inputExpression to show suggestions correctly
+				// while we don't accept the final expression yet
+				expression: inputExpression,
+			}).queryData,
+		[timeRange.startTime, timeRange.endTime, inputExpression],
+	);
+
 	const {
 		logs,
-		hasReachedEndOfLogs,
-		isPaginating,
-		currentPage,
-		setIsPaginating,
-		handleNewData,
 		loadMoreLogs,
-		queryPayload,
-	} = useHandleLogsPagination({
-		timeRange,
-		filters,
-		excludeFilterKeys: ['host.name'],
-		basePayload,
+		hasNextPage,
+		isFetchingNextPage,
+		isLoading,
+		isFetching,
+		isError,
+	} = useInfiniteHostMetricLogs({
+		expression: debouncedFilterExpression,
+		startTime: timeRange.startTime,
+		endTime: timeRange.endTime,
 	});
-
-	const { data, isLoading, isFetching, isError } = useQuery({
-		queryKey: [
-			'hostMetricsLogs',
-			timeRange.startTime,
-			timeRange.endTime,
-			filters,
-			currentPage,
-		],
-		queryFn: () => GetMetricQueryRange(queryPayload, DEFAULT_ENTITY_VERSION),
-		enabled: !!queryPayload,
-		keepPreviousData: isPaginating,
-	});
-
-	useEffect(() => {
-		if (data?.payload?.data?.newResult?.data?.result) {
-			handleNewData(data.payload.data.newResult.data.result);
-		}
-	}, [data, handleNewData]);
-
-	useEffect(() => {
-		setIsPaginating(false);
-	}, [data, setIsPaginating]);
 
 	const handleScrollToLog = useScrollToLog({
 		logs,
@@ -122,14 +188,14 @@ function HostMetricsLogs({ timeRange, filters }: Props): JSX.Element {
 	const renderFooter = useCallback(
 		(): JSX.Element | null => (
 			<>
-				{isFetching ? (
+				{isFetchingNextPage ? (
 					<div className="logs-loading-skeleton"> Loading more logs ... </div>
-				) : hasReachedEndOfLogs ? (
+				) : !hasNextPage && logs.length > 0 ? (
 					<div className="logs-loading-skeleton"> *** End *** </div>
 				) : null}
 			</>
 		),
-		[isFetching, hasReachedEndOfLogs],
+		[isFetchingNextPage, hasNextPage, logs.length],
 	);
 
 	const renderContent = useMemo(
@@ -155,31 +221,59 @@ function HostMetricsLogs({ timeRange, filters }: Props): JSX.Element {
 		[logs, loadMoreLogs, getItemContent, renderFooter],
 	);
 
+	const showInitialLoading = isLoading || (isFetching && logs.length === 0);
+
 	return (
-		<div className="host-metrics-logs">
-			{isLoading && <LogsLoading />}
-			{!isLoading && !isError && logs.length === 0 && <NoLogsContainer />}
-			{isError && !isLoading && <LogsError />}
-			{!isLoading && !isError && logs.length > 0 && (
-				<div
-					className="host-metrics-logs-list-container"
-					data-log-detail-ignore="true"
-				>
-					{renderContent}
+		<div className="host-metrics-logs-container">
+			<div className="host-metrics-logs-header">
+				<div className="datetime-section">
+					<DateTimeSelectionV2
+						showAutoRefresh
+						showRefreshText={false}
+						hideShareModal
+						isModalTimeSelection={isModalTimeSelection}
+						onTimeChange={handleTimeChange}
+						defaultRelativeTime="5m"
+						modalSelectedInterval={selectedInterval}
+						modalInitialStartTime={timeRange.startTime * 1000}
+						modalInitialEndTime={timeRange.endTime * 1000}
+					/>
 				</div>
-			)}
-			{selectedTab && activeLog && (
-				<LogDetail
-					log={activeLog}
-					onClose={handleCloseLogDetail}
-					logs={logs}
-					onNavigateLog={handleSetActiveLog}
-					selectedTab={selectedTab}
-					onAddToQuery={onAddToQuery}
-					onClickActionItem={onAddToQuery}
-					onScrollToLog={handleScrollToLog}
+			</div>
+			<div className="filter-section">
+				<QuerySearch
+					queryData={queryData}
+					onChange={handleFilterChange}
+					dataSource={DataSource.LOGS}
 				/>
-			)}
+			</div>
+			<div className="host-metrics-logs">
+				{showInitialLoading && <LogsLoading />}
+				{!showInitialLoading && !isError && logs.length === 0 && (
+					<NoLogsContainer />
+				)}
+				{isError && !showInitialLoading && <LogsError />}
+				{!showInitialLoading && !isError && logs.length > 0 && (
+					<div
+						className="host-metrics-logs-list-container"
+						data-log-detail-ignore="true"
+					>
+						{renderContent}
+					</div>
+				)}
+				{selectedTab && activeLog && (
+					<LogDetail
+						log={activeLog}
+						onClose={handleCloseLogDetail}
+						logs={logs}
+						onNavigateLog={handleSetActiveLog}
+						selectedTab={selectedTab}
+						onAddToQuery={onAddToQuery}
+						onClickActionItem={onAddToQuery}
+						onScrollToLog={handleScrollToLog}
+					/>
+				)}
+			</div>
 		</div>
 	);
 }

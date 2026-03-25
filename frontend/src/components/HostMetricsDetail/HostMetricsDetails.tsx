@@ -39,6 +39,7 @@ import {
 	ScrollText,
 	X,
 } from 'lucide-react';
+import { parseAsString, useQueryState } from 'nuqs';
 import { AppState } from 'store/reducers';
 import { DataTypes } from 'types/api/queryBuilder/queryAutocompleteResponse';
 import {
@@ -52,15 +53,18 @@ import {
 import { GlobalReducer } from 'types/reducer/globalTime';
 import { v4 as uuidv4 } from 'uuid';
 
+import { convertFiltersToExpression } from '../QueryBuilderV2/utils';
 import { VIEW_TYPES, VIEWS } from './constants';
 import Containers from './Containers/Containers';
 import { HostDetailProps } from './HostMetricDetail.interfaces';
-import HostMetricLogsDetailedView from './HostMetricsLogs/HostMetricLogsDetailedView';
+import { HOST_METRICS_LOGS_EXPR_QUERY_KEY } from './HostMetricsLogs/constants';
+import HostMetricsLogs from './HostMetricsLogs/HostMetricsLogs';
 import HostMetricTraces from './HostMetricTraces/HostMetricTraces';
 import Metrics from './Metrics/Metrics';
 import Processes from './Processes/Processes';
 
 import './HostMetricsDetail.styles.scss';
+
 // eslint-disable-next-line sonarjs/cognitive-complexity
 function HostMetricsDetails({
 	host,
@@ -129,10 +133,6 @@ function HostMetricsDetails({
 		};
 	}, [host?.hostName, searchParams]);
 
-	const [logFilters, setLogFilters] = useState<IBuilderQuery['filters']>(
-		initialFilters,
-	);
-
 	const [tracesFilters, setTracesFilters] = useState<IBuilderQuery['filters']>(
 		initialFilters,
 	);
@@ -147,7 +147,6 @@ function HostMetricsDetails({
 	}, [host]);
 
 	useEffect(() => {
-		setLogFilters(initialFilters);
 		setTracesFilters(initialFilters);
 	}, [initialFilters]);
 
@@ -172,7 +171,6 @@ function HostMetricsDetails({
 			setSearchParams({
 				...Object.fromEntries(searchParams.entries()),
 				[INFRA_MONITORING_K8S_PARAMS_KEYS.VIEW]: e.target.value,
-				[INFRA_MONITORING_K8S_PARAMS_KEYS.LOG_FILTERS]: JSON.stringify(null),
 				[INFRA_MONITORING_K8S_PARAMS_KEYS.TRACES_FILTERS]: JSON.stringify(null),
 			});
 		}
@@ -210,48 +208,30 @@ function HostMetricsDetails({
 		[],
 	);
 
-	const handleChangeLogFilters = useCallback(
-		(value: IBuilderQuery['filters'], view: VIEWS) => {
-			setLogFilters((prevFilters) => {
-				const hostNameFilter = prevFilters?.items?.find(
-					(item) => item.key?.key === 'host.name',
-				);
-				const paginationFilter = value?.items?.find(
-					(item) => item.key?.key === 'id',
-				);
-				const newFilters = value?.items?.filter(
-					(item) => item.key?.key !== 'id' && item.key?.key !== 'host.name',
-				);
+	const initialLogsExpression = useMemo(
+		() =>
+			convertFiltersToExpression({
+				items: [
+					{
+						id: uuidv4(),
+						key: {
+							key: 'host.name',
+							dataType: DataTypes.String,
+							type: 'resource',
+							id: 'host.name--string--resource--false',
+						},
+						op: '=',
+						value: host?.hostName || '',
+					},
+				],
+				op: 'AND',
+			}).expression,
+		[host?.hostName],
+	);
 
-				if (newFilters && newFilters?.length > 0) {
-					logEvent(InfraMonitoringEvents.FilterApplied, {
-						entity: InfraMonitoringEvents.HostEntity,
-						view: InfraMonitoringEvents.LogsView,
-						page: InfraMonitoringEvents.DetailedPage,
-					});
-				}
-
-				const updatedFilters = {
-					op: 'AND',
-					items: [
-						hostNameFilter,
-						...(newFilters || []),
-						...(paginationFilter ? [paginationFilter] : []),
-					].filter((item): item is TagFilterItem => item !== undefined),
-				};
-
-				setSearchParams({
-					...Object.fromEntries(searchParams.entries()),
-					[INFRA_MONITORING_K8S_PARAMS_KEYS.LOG_FILTERS]: JSON.stringify(
-						updatedFilters,
-					),
-					[INFRA_MONITORING_K8S_PARAMS_KEYS.VIEW]: view,
-				});
-				return updatedFilters;
-			});
-		},
-		// eslint-disable-next-line react-hooks/exhaustive-deps
-		[],
+	const [hostMetricLogsExpr] = useQueryState(
+		HOST_METRICS_LOGS_EXPR_QUERY_KEY,
+		parseAsString,
 	);
 
 	const handleChangeTracesFilters = useCallback(
@@ -308,11 +288,6 @@ function HostMetricsDetails({
 		});
 
 		if (selectedView === VIEW_TYPES.LOGS) {
-			const filtersWithoutPagination = {
-				...logFilters,
-				items: logFilters?.items?.filter((item) => item.key?.key !== 'id') || [],
-			};
-
 			const compositeQuery = {
 				...initialQueryState,
 				queryType: 'builder',
@@ -322,7 +297,11 @@ function HostMetricsDetails({
 						{
 							...initialQueryBuilderFormValuesMap.logs,
 							aggregateOperator: LogsAggregatorOperator.NOOP,
-							filters: filtersWithoutPagination,
+							filter: { expression: hostMetricLogsExpr },
+							expression: hostMetricLogsExpr,
+							having: {
+								expression: '',
+							},
 						},
 					],
 				},
@@ -564,12 +543,11 @@ function HostMetricsDetails({
 						/>
 					)}
 					{selectedView === VIEW_TYPES.LOGS && (
-						<HostMetricLogsDetailedView
+						<HostMetricsLogs
 							timeRange={modalTimeRange}
 							isModalTimeSelection={isModalTimeSelection}
 							handleTimeChange={handleTimeChange}
-							handleChangeLogFilters={handleChangeLogFilters}
-							logFilters={logFilters}
+							initialExpression={initialLogsExpression}
 							selectedInterval={selectedInterval}
 						/>
 					)}
