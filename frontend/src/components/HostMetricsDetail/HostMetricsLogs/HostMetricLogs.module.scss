@@ -1,13 +1,13 @@
 .header {
-  display: flex;
-  justify-content: flex-end;
-  padding: var(--spacing-4) 0px;
-  border-radius: 3px;
+	display: flex;
+	justify-content: flex-end;
+	padding: var(--spacing-4) 0px;
+	border-radius: 3px;
 }
 
 .logs {
-  border: 1px solid var(--border);
-  margin-top: var(--spacing-4);
+	border: 1px solid var(--border);
+	margin-top: var(--spacing-4);
 }
 
 .listContainer {
@@ -62,5 +62,3 @@
 		gap: 16px;
 	}
 }
-
-
