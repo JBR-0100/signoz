@@ -1,0 +1,66 @@
+.header {
+  display: flex;
+  justify-content: flex-end;
+  padding: var(--spacing-4) 0px;
+  border-radius: 3px;
+}
+
+.logs {
+  border: 1px solid var(--border);
+  margin-top: var(--spacing-4);
+}
+
+.listContainer {
+	flex: 1;
+	height: calc(100vh - 278px) !important;
+	display: flex;
+	height: 100%;
+
+	:global(.raw-log-content) {
+		width: 100%;
+		text-wrap: inherit;
+		word-wrap: break-word;
+	}
+}
+
+.listCard {
+	width: 100%;
+	margin-top: 12px;
+
+	:global(.ant-card-body) {
+		padding: 0;
+		height: 100%;
+		width: 100%;
+	}
+}
+
+.logsLoadingSkeleton {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	gap: 8px;
+	padding: 8px 0;
+
+	:global(.ant-skeleton-input-sm) {
+		height: 18px;
+	}
+}
+
+.noLogsFound {
+	height: 50vh;
+	width: 100%;
+	display: flex;
+	justify-content: center;
+	align-items: center;
+	padding: 24px;
+	box-sizing: border-box;
+
+	p {
+		display: flex;
+		align-items: center;
+		gap: 16px;
+	}
+}
+
+

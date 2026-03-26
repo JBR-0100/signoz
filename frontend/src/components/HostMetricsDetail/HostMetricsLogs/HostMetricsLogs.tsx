@@ -32,7 +32,7 @@ import {
 import { useInfiniteHostMetricLogs } from './hooks';
 import NoLogsContainer from './NoLogsContainer';
 
-import './HostMetricLogs.styles.scss';
+import styles from './HostMetricLogs.module.scss';
 
 interface Props {
 	initialExpression: string;
@@ -189,9 +189,9 @@ function HostMetricsLogs({
 		(): JSX.Element | null => (
 			<>
 				{isFetchingNextPage ? (
-					<div className="logs-loading-skeleton"> Loading more logs ... </div>
+					<div className={styles.logsLoadingSkeleton}> Loading more logs ... </div>
 				) : !hasNextPage && logs.length > 0 ? (
-					<div className="logs-loading-skeleton"> *** End *** </div>
+					<div className={styles.logsLoadingSkeleton}> *** End *** </div>
 				) : null}
 			</>
 		),
@@ -200,10 +200,9 @@ function HostMetricsLogs({
 
 	const renderContent = useMemo(
 		() => (
-			<Card bordered={false} className="host-metrics-logs-list-card">
+			<Card bordered={false} className={styles.listCard}>
 				<OverlayScrollbar isVirtuoso>
 					<Virtuoso
-						className="host-metrics-logs-virtuoso"
 						key="host-metrics-logs-virtuoso"
 						ref={virtuosoRef}
 						data={logs}
@@ -224,40 +223,35 @@ function HostMetricsLogs({
 	const showInitialLoading = isLoading || (isFetching && logs.length === 0);
 
 	return (
-		<div className="host-metrics-logs-container">
-			<div className="host-metrics-logs-header">
-				<div className="datetime-section">
-					<DateTimeSelectionV2
-						showAutoRefresh
-						showRefreshText={false}
-						hideShareModal
-						isModalTimeSelection={isModalTimeSelection}
-						onTimeChange={handleTimeChange}
-						defaultRelativeTime="5m"
-						modalSelectedInterval={selectedInterval}
-						modalInitialStartTime={timeRange.startTime * 1000}
-						modalInitialEndTime={timeRange.endTime * 1000}
-					/>
-				</div>
-			</div>
-			<div className="filter-section">
-				<QuerySearch
-					queryData={queryData}
-					onChange={handleFilterChange}
-					dataSource={DataSource.LOGS}
+		<>
+			<div className={styles.header}>
+				<DateTimeSelectionV2
+					showAutoRefresh
+					showRefreshText={false}
+					hideShareModal
+					isModalTimeSelection={isModalTimeSelection}
+					onTimeChange={handleTimeChange}
+					defaultRelativeTime="5m"
+					modalSelectedInterval={selectedInterval}
+					modalInitialStartTime={timeRange.startTime * 1000}
+					modalInitialEndTime={timeRange.endTime * 1000}
 				/>
 			</div>
-			<div className="host-metrics-logs">
+
+			<QuerySearch
+				queryData={queryData}
+				onChange={handleFilterChange}
+				dataSource={DataSource.LOGS}
+			/>
+
+			<div className={styles.logs}>
 				{showInitialLoading && <LogsLoading />}
 				{!showInitialLoading && !isError && logs.length === 0 && (
 					<NoLogsContainer />
 				)}
 				{isError && !showInitialLoading && <LogsError />}
 				{!showInitialLoading && !isError && logs.length > 0 && (
-					<div
-						className="host-metrics-logs-list-container"
-						data-log-detail-ignore="true"
-					>
+					<div className={styles.listContainer} data-log-detail-ignore="true">
 						{renderContent}
 					</div>
 				)}
@@ -274,7 +268,7 @@ function HostMetricsLogs({
 					/>
 				)}
 			</div>
-		</div>
+		</>
 	);
 }
 
