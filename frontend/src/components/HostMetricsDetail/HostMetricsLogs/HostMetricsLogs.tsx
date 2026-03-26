@@ -69,9 +69,16 @@ function HostMetricsLogs({
 	);
 
 	useEffect(() => {
+		// If expression is present in the URL, prefer it and don't override it.
+		// Otherwise, initialize URL state from the host's default expression.
+		if (filterExpression) {
+			setInputExpression(filterExpression);
+			return;
+		}
+
 		setInputExpression(initialExpression);
 		setFilterExpression(initialExpression);
-	}, [initialExpression, setFilterExpression]);
+	}, [filterExpression, initialExpression, setFilterExpression]);
 
 	const debouncedFilterExpression = useDebounce(
 		filterExpression?.trim() || initialExpression,

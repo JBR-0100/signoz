@@ -2,6 +2,7 @@ import { VirtuosoMockContext } from 'react-virtuoso';
 import { ENVIRONMENT } from 'constants/env';
 import { server } from 'mocks-server/server';
 import { rest } from 'msw';
+import { NuqsTestingAdapter } from 'nuqs/adapters/testing';
 import { act, render, screen, userEvent, waitFor } from 'tests/test-utils';
 
 import HostMetricsLogs from '../HostMetricsLogs';
@@ -183,15 +184,23 @@ const createFieldValuesResponse = (): any => ({
 	},
 });
 
-const renderComponent = (props = defaultProps): ReturnType<typeof render> =>
+const renderComponent = (
+	props = defaultProps,
+	searchParams?: Record<string, string>,
+): ReturnType<typeof render> =>
 	render(
-		<VirtuosoMockContext.Provider value={{ viewportHeight: 600, itemHeight: 50 }}>
-			<HostMetricsLogs {...props} />
-		</VirtuosoMockContext.Provider>,
+		<NuqsTestingAdapter searchParams={searchParams} hasMemory>
+			<VirtuosoMockContext.Provider
+				value={{ viewportHeight: 600, itemHeight: 50 }}
+			>
+				<HostMetricsLogs {...props} />
+			</VirtuosoMockContext.Provider>
+		</NuqsTestingAdapter>,
 	);
 
 describe('HostMetricsLogs', () => {
 	beforeEach(() => {
+		window.history.pushState({}, 'Test', '/');
 		server.use(
 			rest.get(FIELDS_KEYS_URL, (_, res, ctx) =>
 				res(ctx.status(200), ctx.json(createFieldKeysResponse())),
@@ -429,6 +438,53 @@ describe('HostMetricsLogs', () => {
 			const querySpec = firstPayload.compositeQuery?.queries?.[0]?.spec;
 
 			expect(querySpec?.filter?.expression).toContain('host_name = "test-host"');
+		});
+
+		it('should load expression from URL and persist it in the query', async () => {
+			const requestPayloads: any[] = [];
+
+			server.use(
+				rest.post(QUERY_RANGE_URL, async (req, res, ctx) => {
+					const payload = await req.json();
+					requestPayloads.push(payload);
+
+					const querySpec = payload.compositeQuery?.queries?.[0]?.spec;
+					const offset = querySpec?.offset ?? 0;
+
+					return res(
+						ctx.status(200),
+						ctx.json(
+							createLogsResponse({
+								offset,
+								pageSize: 100,
+								hasMore: offset === 0,
+							}),
+						),
+					);
+				}),
+			);
+
+			const urlExpression = 'service = "from-url"';
+
+			renderComponent(defaultProps, { hostMetricsLogsExpr: urlExpression });
+
+			await waitFor(() => {
+				expect(requestPayloads.length).toBeGreaterThanOrEqual(1);
+			});
+
+			expect(
+				requestPayloads[0]?.compositeQuery?.queries?.[0]?.spec?.filter?.expression,
+			).toContain(urlExpression);
+
+			await userEvent.click(screen.getByTestId('virtuoso-end-reached'));
+
+			await waitFor(() => {
+				expect(requestPayloads.length).toBeGreaterThanOrEqual(2);
+			});
+
+			expect(
+				requestPayloads[1]?.compositeQuery?.queries?.[0]?.spec?.filter?.expression,
+			).toContain(urlExpression);
 		});
 
 		it('should use custom expression when provided', async () => {
