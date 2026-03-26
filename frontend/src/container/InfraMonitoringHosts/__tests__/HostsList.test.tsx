@@ -4,6 +4,7 @@ import { Provider } from 'react-redux';
 import { MemoryRouter } from 'react-router-dom';
 import { render } from '@testing-library/react';
 import * as useGetHostListHooks from 'hooks/infraMonitoring/useGetHostList';
+import { NuqsTestingAdapter } from 'nuqs/adapters/testing';
 import * as appContextHooks from 'providers/App/App';
 import * as timezoneHooks from 'providers/Timezone';
 import store from 'store';
@@ -130,26 +131,30 @@ jest.spyOn(appContextHooks, 'useAppContext').mockReturnValue({
 describe('HostsList', () => {
 	it('renders hosts list table', () => {
 		const { container } = render(
-			<QueryClientProvider client={queryClient}>
-				<MemoryRouter>
-					<Provider store={store}>
-						<HostsList />
-					</Provider>
-				</MemoryRouter>
-			</QueryClientProvider>,
+			<NuqsTestingAdapter>
+				<QueryClientProvider client={queryClient}>
+					<MemoryRouter>
+						<Provider store={store}>
+							<HostsList />
+						</Provider>
+					</MemoryRouter>
+				</QueryClientProvider>
+			</NuqsTestingAdapter>,
 		);
 		expect(container.querySelector('.hosts-list-table')).toBeInTheDocument();
 	});
 
 	it('renders filters', () => {
 		const { container } = render(
-			<QueryClientProvider client={queryClient}>
-				<MemoryRouter>
-					<Provider store={store}>
-						<HostsList />
-					</Provider>
-				</MemoryRouter>
-			</QueryClientProvider>,
+			<NuqsTestingAdapter>
+				<QueryClientProvider client={queryClient}>
+					<MemoryRouter>
+						<Provider store={store}>
+							<HostsList />
+						</Provider>
+					</MemoryRouter>
+				</QueryClientProvider>
+			</NuqsTestingAdapter>,
 		);
 		expect(container.querySelector('.filters')).toBeInTheDocument();
 	});
